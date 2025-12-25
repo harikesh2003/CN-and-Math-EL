@@ -1,0 +1,276 @@
+:root {
+    --primary-color: #4f46e5;
+    /* Indigo */
+    --bg-app: #f3f4f6;
+    --bg-white: #ffffff;
+    --border-color: #e5e7eb;
+    --text-main: #111827;
+    --text-muted: #6b7280;
+    --sidebar-width: 240px;
+    --props-width: 300px;
+}
+
+body {
+    background-color: var(--bg-app);
+    color: var(--text-main);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    margin: 0;
+}
+
+.app-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* Sidebar */
+.sidebar {
+    width: var(--sidebar-width);
+    background: var(--bg-white);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    z-index: 50;
+}
+
+.sidebar-header {
+    height: 60px;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.section-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    padding: 20px 20px 10px;
+}
+
+.tools-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    padding: 0 20px;
+}
+
+.tool-btn {
+    aspect-ratio: 1;
+    border: 1px solid var(--border-color);
+    background: white;
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 1.25rem;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.tool-btn:hover {
+    background: #f9fafb;
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.tool-btn.active {
+    background: #eff4ff;
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+}
+
+.sidebar-footer {
+    margin-top: auto;
+    border-top: 1px solid var(--border-color);
+    padding: 15px;
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.user-info .name {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.user-info .role {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Main Content */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #f8fafc;
+}
+
+.topbar {
+    height: 60px;
+    background: var(--bg-white);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+}
+
+.canvas-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    cursor: grab;
+    /* Default cursor for area */
+}
+
+/* THE CANVAS VIEWPORT - Critical for interaction */
+.canvas-viewport {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #f0f0f0;
+    background-image: radial-gradient(#ccc 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    /* Let events bubble to viewport usually, but wait... */
+}
+
+/* 
+ * CRITICAL INTERACTION FIX:
+ * We need the #uiLayer to ACCEPT events if it's top, 
+ * OR we attach events to .canvas-viewport and ignore canvas elements.
+ * Best practice: Wrapper handles events. Canvases are passive displays.
+ */
+
+.floating-card {
+    position: absolute;
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-color);
+    display: flex;
+    gap: 20px;
+}
+
+.bottom-left {
+    bottom: 24px;
+    left: 24px;
+}
+
+.stat-item .label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.stat-item .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.zoom-controls {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    display: flex;
+    gap: 8px;
+}
+
+.zoom-controls .btn {
+    border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    font-weight: 600;
+}
+
+#btnResetZoom {
+    width: auto;
+    padding: 0 12px;
+}
+
+/* Right Panel */
+.properties-panel {
+    width: var(--props-width);
+    background: var(--bg-white);
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-header {
+    height: 50px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.panel-header h6 {
+    margin: 0;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.options-card {
+    background: #f9fafb;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.log-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    background: #111827;
+    /* Dark terminal for logs */
+}
+
+.log-entry {
+    font-family: 'Menlo', monospace;
+    font-size: 0.75rem;
+    color: #4ade80;
+    /* Matrix green */
+    margin-bottom: 4px;
+    border-bottom: 1px solid #374151;
+    padding-bottom: 2px;
+}
+
+.padding-h {
+    padding: 0 20px;
+}

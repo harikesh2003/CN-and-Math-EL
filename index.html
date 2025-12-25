@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wi-Fi Optimizer Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="bi bi-wifi-2 fs-4 text-primary"></i>
+                <span class="fw-bold ms-2">NetPlan.ai</span>
+            </div>
+
+            <div class="section-title">TOOLS</div>
+            <div class="tools-grid">
+                <button class="tool-btn active" id="toolSelect" data-tool="select" title="Select / Pan (V)">
+                    <i class="bi bi-cursor-fill"></i>
+                </button>
+                <button class="tool-btn" id="toolRoom" data-tool="room" title="Draw Room (R)">
+                    <i class="bi bi-square"></i>
+                </button>
+                <button class="tool-btn" id="toolWall" data-tool="wall" title="Draw Wall (W)">
+                    <i class="bi bi-dash-lg"></i>
+                </button>
+                <button class="tool-btn" id="toolDoor" data-tool="door" title="Door (D)">
+                    <i class="bi bi-door-open"></i>
+                </button>
+                <button class="tool-btn" id="toolWindow" data-tool="window" title="Window (G)">
+                    <i class="bi bi-window"></i>
+                </button>
+                <button class="tool-btn" id="toolEraser" data-tool="erase" title="Eraser (E)">
+                    <i class="bi bi-eraser"></i>
+                </button>
+            </div>
+
+            <div class="section-title mt-4">ACTIONS</div>
+            <div class="d-grid gap-2 padding-h">
+                <button class="btn btn-outline-secondary btn-sm d-flex justify-content-between align-items-center"
+                    id="btnUndo">
+                    <span>Undo</span> <span class="badge bg-secondary-subtle text-secondary-emphasis">Ctrl+Z</span>
+                </button>
+                <button class="btn btn-outline-secondary btn-sm d-flex justify-content-between align-items-center"
+                    id="btnRedo">
+                    <span>Redo</span> <span class="badge bg-secondary-subtle text-secondary-emphasis">Ctrl+Y</span>
+                </button>
+                <button class="btn btn-danger-subtle text-danger btn-sm mt-2" id="btnClear">
+                    <i class="bi bi-trash me-2"></i> Clear All
+                </button>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="avatar bg-primary text-white">S</div>
+                    <div class="user-info">
+                        <div class="name">Silver User</div>
+                        <div class="role">Network Architect</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="topbar">
+                <div class="page-title">
+                    <h5 class="mb-0 fw-bold">Floor Plan Project</h5>
+                    <span class="text-secondary small">Last edited just now</span>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <div class="dropdown">
+                        <button class="btn btn-white border dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            View Options
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" id="toggleGrid">Toggle Grid</a></li>
+                            <li><a class="dropdown-item" href="#" id="toggleHeatmap">Toggle Heatmap</a></li>
+                        </ul>
+                    </div>
+                    <button class="btn btn-primary fw-semibold shadow-sm" id="btnOptimize">
+                        <i class="bi bi-magic me-2"></i> Auto-Optimize Placement
+                    </button>
+                </div>
+            </header>
+
+            <!-- Canvas Wrapper -->
+            <div class="canvas-area">
+                <div class="canvas-viewport" id="canvasContainer">
+                    <canvas id="floorPlan"></canvas>
+                    <canvas id="heatmap"></canvas>
+                    <canvas id="uiLayer"></canvas>
+                </div>
+
+                <!-- Floating Info Card -->
+                <div class="floating-card bottom-left">
+                    <div class="stat-item">
+                        <div class="label">Signal Coverage</div>
+                        <div class="value text-success" id="coverageVal">0%</div>
+                    </div>
+                    <div class="stat-item border-start ps-3">
+                        <div class="label">Dead Zones</div>
+                        <div class="value text-danger" id="deadZoneVal">100%</div>
+                    </div>
+                </div>
+
+                <!-- Zoom Controls -->
+                <div class="zoom-controls">
+                    <button class="btn btn-white shadow-sm" id="btnZoomIn"><i class="bi bi-plus-lg"></i></button>
+                    <button class="btn btn-white shadow-sm" id="btnResetZoom">100%</button>
+                    <button class="btn btn-white shadow-sm" id="btnZoomOut"><i class="bi bi-dash-lg"></i></button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Panel (Config) -->
+        <aside class="properties-panel">
+            <div class="panel-header">
+                <h6>Configuration</h6>
+            </div>
+
+            <div class="p-3">
+                <label class="form-label fw-medium small">Router Settings</label>
+                <div class="options-card">
+                    <div class="mb-3">
+                        <label class="text-secondary small mb-1">Transmit Power (dBm)</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="range" class="form-range" id="txPower" min="10" max="30" value="20">
+                            <span class="badge bg-light text-dark border" id="txPowerVal">20</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-1">
+                        <label class="text-secondary small mb-1">Frequency</label>
+                        <select class="form-select form-select-sm" id="frequency">
+                            <option value="2.4">2.4 GHz (Long Range)</option>
+                            <option value="5.0">5.0 GHz (High Speed)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="alert alert-info small mt-3 border-0 bg-info-subtle text-info-emphasis">
+                    <i class="bi bi-info-circle-fill me-1"></i>
+                    Right-click on the canvas to manually place a Wi-Fi router.
+                </div>
+            </div>
+
+            <div class="panel-header border-top border-light-subtle mt-2">
+                <h6>Log</h6>
+            </div>
+            <div class="log-container" id="optimizationLog">
+                <div class="log-entry text-secondary">System initialized...</div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="static/js/math_utils.js"></script>
+    <script src="static/js/grid.js"></script>
+    <script src="static/js/renderer.js"></script>
+    <script src="static/js/signal_engine.js"></script>
+    <script src="static/js/app.js"></script>
+</body>
+
+</html>
