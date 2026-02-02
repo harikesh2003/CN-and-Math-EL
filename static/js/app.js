@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderer = new ThreeRenderer('canvasContainer', floorPlan);
     const engine = new SignalEngine(floorPlan);
 
-    let currentTool = 'select'; // select (pan), room, wall, door, window, erase
+    let currentTool = 'select'; // select, router, room, wall, door, window, erase
     let isDragging = false;
     let dragStart = { x: 0, y: 0 }; // World Coords
 
@@ -40,6 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Core Logic ---
     function updateSimulation(full = false) {
+        // Always clear UI first to avoid ghosts
+        renderer.clear(renderer.uiCtx);
+
         if (!floorPlan.router) {
             renderer.heatmapGroup.clear();
             renderer.drawRouterOnUI();
@@ -63,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const renderAll = () => {
+        renderer.clear(renderer.uiCtx); // Explicit clear
         renderer.drawWalls();
         renderer.drawRouterOnUI();
     };
@@ -297,6 +301,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // Init
     setTimeout(handleResize, 100);
 
+    // --- Keyboard Shortcuts ---
+    document.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+
+        // Undo: Ctrl+Z
+        if (e.ctrlKey && key === 'z') {
+            e.preventDefault();
+            if (floorPlan.undo()) { renderAll(); requestVisUpdate(); log('Undo'); }
+        }
+        // Redo: Ctrl+Y or Ctrl+Shift+Z
+        if ((e.ctrlKey && key === 'y') || (e.ctrlKey && e.shiftKey && key === 'z')) {
+            e.preventDefault();
+            if (floorPlan.redo()) { renderAll(); requestVisUpdate(); log('Redo'); }
+        }
+
+        // Delete Mode? Maybe just Esc to reset tool
+        if (e.key === 'Escape') {
+            // currentTool = 'select'; // logic to reset tool?
+        }
+        // Delete/Backspace
+        if (key === 'delete' || key === 'backspace') {
+            log(`Use the Eraser tool (E) to remove items.`);
+        }
+    });
+
     // --- Toolbar Actions ---
     document.getElementById('btnUndo').addEventListener('click', () => {
         if (floorPlan.undo()) { renderAll(); requestVisUpdate(); log('Undo'); }
@@ -305,7 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (floorPlan.redo()) { renderAll(); requestVisUpdate(); log('Redo'); }
     });
     document.getElementById('btnClear').addEventListener('click', () => {
-        if (confirm('Delete Everything?')) { floorPlan.clearWalls(); renderAll(); requestVisUpdate(); log('Cleared All'); }
+        if (confirm('Delete Everything?')) { floorPlan.clearAll(); renderAll(); requestVisUpdate(); log('Cleared All'); }
     });
 
     // --- Config Actions ---

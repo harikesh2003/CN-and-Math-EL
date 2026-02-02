@@ -1,7 +1,7 @@
 class SignalEngine {
     constructor(floorPlan) {
         this.floorPlan = floorPlan;
-        this.resolution = 10; // 10px blocks for Heatmap
+        this.resolution = 5; // 5px blocks for Higher Fidelity Heatmap
     }
 
     /**
@@ -19,24 +19,45 @@ class SignalEngine {
         if (!this.floorPlan.router) return { matrix, stats: { coverage: 0, dead: 100 } };
 
         const router = this.floorPlan.router;
+        const boosters = this.floorPlan.boosters || [];
+
+        // 1. Determine active boosters (Repeaters)
+        // A booster acts as a source if it receives good signal from Router (> -80dBm)
+        const activeSources = [{ pos: router, power: txPower }];
+
+        boosters.forEach(b => {
+            const signalAtBooster = MathUtils.calculateRSSI(router, txPower, parseFloat(frequency), b, this.floorPlan.walls);
+            if (signalAtBooster > -80) {
+                // It repeats! Let's say it repeats at same power or slightly less?
+                // Let's assume re-transmit at input power (ideal repeater)
+                activeSources.push({ pos: b, power: txPower });
+            }
+        });
 
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 // Center of the block
                 const x = c * this.resolution + (this.resolution / 2);
                 const y = r * this.resolution + (this.resolution / 2);
+                const target = { x, y };
 
-                const rssi = MathUtils.calculateRSSI(
-                    router,
-                    txPower,
-                    parseFloat(frequency),
-                    { x, y },
-                    this.floorPlan.walls
-                );
+                // Get max signal from all active sources
+                let bestRssi = -100;
 
-                matrix[r][c] = rssi;
+                for (let source of activeSources) {
+                    const rssi = MathUtils.calculateRSSI(
+                        source.pos,
+                        source.power,
+                        parseFloat(frequency),
+                        target,
+                        this.floorPlan.walls
+                    );
+                    if (rssi > bestRssi) bestRssi = rssi;
+                }
 
-                if (rssi > -75) coverageCount++;
+                matrix[r][c] = bestRssi;
+
+                if (bestRssi > -75) coverageCount++;
                 else deadZoneCount++;
             }
         }

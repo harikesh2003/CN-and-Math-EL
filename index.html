@@ -19,13 +19,19 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <i class="bi bi-wifi-2 fs-4 text-primary"></i>
-                <span class="fw-bold ms-2">NetPlan.ai</span>
+                <span class="fw-bold ms-2">Net Plan</span>
             </div>
 
             <div class="section-title">TOOLS</div>
             <div class="tools-grid">
                 <button class="tool-btn active" id="toolSelect" data-tool="select" title="Select / Pan (V)">
                     <i class="bi bi-cursor-fill"></i>
+                </button>
+                <button class="tool-btn" id="toolRouter" data-tool="router" title="Place Router (P)">
+                    <i class="bi bi-router"></i>
+                </button>
+                <button class="tool-btn" id="toolBooster" data-tool="booster" title="Place Signal Booster (B)">
+                    <i class="bi bi-broadcast-pin"></i>
                 </button>
                 <button class="tool-btn" id="toolRoom" data-tool="room" title="Draw Room (R)">
                     <i class="bi bi-square"></i>
@@ -44,30 +50,34 @@
                 </button>
             </div>
 
-            <div class="section-title mt-4">ACTIONS</div>
-            <div class="d-grid gap-2 padding-h">
-                <button class="btn btn-outline-secondary btn-sm d-flex justify-content-between align-items-center"
-                    id="btnUndo">
-                    <span>Undo</span> <span class="badge bg-secondary-subtle text-secondary-emphasis">Ctrl+Z</span>
-                </button>
-                <button class="btn btn-outline-secondary btn-sm d-flex justify-content-between align-items-center"
-                    id="btnRedo">
-                    <span>Redo</span> <span class="badge bg-secondary-subtle text-secondary-emphasis">Ctrl+Y</span>
-                </button>
-                <button class="btn btn-danger-subtle text-danger btn-sm mt-2" id="btnClear">
-                    <i class="bi bi-trash me-2"></i> Clear All
-                </button>
-            </div>
+            <!-- ... -->
 
-            <div class="sidebar-footer">
-                <div class="user-profile">
-                    <div class="avatar bg-primary text-white">S</div>
-                    <div class="user-info">
-                        <div class="name">Silver User</div>
-                        <div class="role">Network Architect</div>
-                    </div>
+            <div class="p-3">
+                <!-- ... -->
+
+                <!-- Wall Config (Dynamic or Static?) -->
+                <!-- Wall Config Removed -->
+
+                <label class="form-label fw-medium small">Router Settings</label>
+
+                <div class="section-title mt-4">ACTIONS</div>
+                <div class="d-grid gap-2 padding-h">
+                    <button class="btn btn-outline-secondary btn-sm d-flex justify-content-between align-items-center"
+                        id="btnUndo">
+                        <span>Undo</span> <span class="badge bg-secondary-subtle text-secondary-emphasis">Ctrl+Z</span>
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm d-flex justify-content-between align-items-center"
+                        id="btnRedo">
+                        <span>Redo</span> <span class="badge bg-secondary-subtle text-secondary-emphasis">Ctrl+Y</span>
+                    </button>
+                    <button class="btn btn-danger-subtle text-danger btn-sm mt-2" id="btnClear">
+                        <i class="bi bi-trash me-2"></i> Clear All
+                    </button>
                 </div>
-            </div>
+
+                <div class="sidebar-footer">
+                    <!-- User Profile Removed -->
+                </div>
         </aside>
 
         <!-- Main Content -->
@@ -131,6 +141,14 @@
             </div>
 
             <div class="p-3">
+                <div class="mb-3">
+                    <label class="text-secondary small mb-1">Wall Thickness</label>
+                    <select class="form-select form-select-sm" id="wallThickness">
+                        <option value="wall">Standard (Brick/Drywall)</option>
+                        <option value="wall_thick">Thick (Concrete/Load Bearing)</option>
+                    </select>
+                </div>
+
                 <label class="form-label fw-medium small">Router Settings</label>
                 <div class="options-card">
                     <div class="mb-3">
@@ -152,7 +170,8 @@
 
                 <div class="alert alert-info small mt-3 border-0 bg-info-subtle text-info-emphasis">
                     <i class="bi bi-info-circle-fill me-1"></i>
-                    Right-click on the canvas to manually place a Wi-Fi router.
+                    Select the <strong><i class="bi bi-router"></i> Router Tool</strong> to place or move the Wi-Fi
+                    access point.
                 </div>
             </div>
 
