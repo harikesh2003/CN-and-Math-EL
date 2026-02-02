@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderer = new Renderer('floorPlan', 'heatmap', 'uiLayer', floorPlan);
     const engine = new SignalEngine(floorPlan);
 
-    let currentTool = 'select'; // select (pan), room, wall, door, window, erase
+    let currentTool = 'select'; // select, router, room, wall, door, window, erase
     let isDragging = false;
     let dragStart = { x: 0, y: 0 }; // World Coords
     let panStart = { x: 0, y: 0 };  // Screen Coords
@@ -39,10 +39,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Core Logic ---
     function updateSimulation(full = false) {
+        // Always clear UI first to avoid ghosts
+        renderer.clear(renderer.uiCtx);
+
         if (!floorPlan.router) {
             renderer.clear(renderer.hmCtx);
             // Draw ghost router if needed or just nothing
-            renderer.drawRouterOnUI();
+            // renderer.drawRouterOnUI(); // Don't draw if null
             return;
         }
 
@@ -63,8 +66,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const renderAll = () => {
+        renderer.clear(renderer.uiCtx); // Explicit clear
         renderer.drawWalls();
-        renderer.drawRouterOnUI(); // Router is mostly static unless dragging
+        renderer.drawRouterOnUI();
     };
 
     // debouncer
@@ -88,6 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Cursor update
             if (currentTool === 'select') canvasViewport.style.cursor = 'grab';
+            else if (currentTool === 'router') canvasViewport.style.cursor = 'crosshair'; // Icon for router?
             else canvasViewport.style.cursor = 'crosshair';
         });
     });
@@ -107,12 +112,11 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAll();
     };
 
-    document.getElementById('btnZoomIn').addEventListener('click', zoomIn);
-    document.getElementById('btnZoomOut').addEventListener('click', zoomOut);
-    document.getElementById('btnResetZoom').addEventListener('click', zoomReset);
+    document.getElementById('btnZoomIn').addEventListener('click', (e) => { e.stopPropagation(); zoomIn(); });
+    document.getElementById('btnZoomOut').addEventListener('click', (e) => { e.stopPropagation(); zoomOut(); });
+    document.getElementById('btnResetZoom').addEventListener('click', (e) => { e.stopPropagation(); zoomReset(); });
 
     // --- Mouse Interactions (Attached to VIEWPORT) ---
-    // Using viewport ensures we catch events even if canvases have pointer-events:none
 
     const getEvtPos = (e) => {
         const rect = canvasViewport.getBoundingClientRect();
@@ -123,17 +127,14 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     canvasViewport.addEventListener('mousedown', (e) => {
+        // Prevent default to stop text selection etc
+        e.preventDefault();
+
         const { mx, my } = getEvtPos(e);
         const worldPos = renderer.screenToWorld(mx, my);
 
-        // Right Click: Place Router
-        if (e.button === 2) {
-            log(`Router placed at ${Math.round(worldPos.x)}, ${Math.round(worldPos.y)}`);
-            floorPlan.setRouter(worldPos.x, worldPos.y);
-            renderAll();
-            requestVisUpdate();
-            return;
-        }
+        // Right Click: Removed in favor of Tool
+        if (e.button === 2) return;
 
         // Left Click
         if (e.button === 0) {
@@ -142,6 +143,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 isDragging = true;
                 panStart = { x: mx, y: my };
                 canvasViewport.style.cursor = 'grabbing';
+                return;
+            }
+
+            // Router Placement
+            if (currentTool === 'router') {
+                log(`Router placed`);
+                floorPlan.setRouter(worldPos.x, worldPos.y);
+                renderAll();
+                requestVisUpdate();
+                return;
+            }
+
+            // Booster Placement
+            if (currentTool === 'booster') {
+                log(`Booster placed`);
+                floorPlan.addBooster(worldPos.x, worldPos.y);
+                renderAll();
+                requestVisUpdate();
                 return;
             }
 
@@ -169,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const worldPos = renderer.screenToWorld(mx, my);
 
         if (!isDragging) {
-            // Hover effects (optional)
+            // Hover logic?
             return;
         }
 
@@ -184,13 +203,22 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Router Drag (if we want to support dragging router while in router mode)
+        /* 
+        if (currentTool === 'router') {
+             floorPlan.setRouter(worldPos.x, worldPos.y);
+             renderAll();
+             // throttle vis update?
+        } 
+        */
+
         // Drag Eraser
         if (currentTool === 'erase') {
             const hit = floorPlan.getWallAt(worldPos);
             if (hit) {
                 floorPlan.removeWall(hit);
                 renderAll();
-                requestVisUpdate(); // maybe too heavy? debounce
+                requestVisUpdate();
             }
             return;
         }
@@ -201,22 +229,11 @@ document.addEventListener('DOMContentLoaded', () => {
         renderer.drawRouterOnUI(); // Keep router visible
 
         if (currentTool === 'room') {
-            // Draw Box Preview
             const w = worldPos.x - dragStart.x;
             const h = worldPos.y - dragStart.y;
-
-            renderer.resetTransform(renderer.uiCtx);
-            renderer.uiCtx.fillStyle = 'rgba(79, 70, 229, 0.1)'; // Indigo tint
-            renderer.uiCtx.strokeStyle = '#4f46e5';
-            renderer.uiCtx.lineWidth = 2 / renderer.scale;
-            renderer.uiCtx.setLineDash([5, 5]);
-
-            renderer.uiCtx.fillRect(dragStart.x, dragStart.y, w, h);
-            renderer.uiCtx.strokeRect(dragStart.x, dragStart.y, w, h);
-            renderer.uiCtx.setLineDash([]);
+            renderer.drawPreviewRect(dragStart, w, h);
         }
         else if (['wall', 'door', 'window'].includes(currentTool)) {
-            // Line Preview
             renderer.drawPreviewLine(dragStart, worldPos);
         }
     });
@@ -225,33 +242,33 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isDragging) return;
         isDragging = false;
 
-        // Restore cursor
-        if (currentTool === 'select') canvasViewport.style.cursor = 'grab';
-        else canvasViewport.style.cursor = 'crosshair';
+        if (currentTool === 'select') {
+            canvasViewport.style.cursor = 'grab';
+            return;
+        }
 
-        // Check if it was a valid drag (screen coords)
+        // Draw tools commit
         const { mx, my } = getEvtPos(e);
-        // If panning, we are done
-        if (currentTool === 'select') return;
-
-        // If drawing
         const worldPos = renderer.screenToWorld(mx, my);
         const dist = Math.sqrt(Math.pow(worldPos.x - dragStart.x, 2) + Math.pow(worldPos.y - dragStart.y, 2));
 
-        // cleanup UI layer
+        // Cleanup UI layer (remove preview lines)
         renderer.clear(renderer.uiCtx);
         renderer.drawRouterOnUI();
 
         if (dist < 5 && currentTool !== 'erase') return; // too small
 
-        // Commit Action
         if (currentTool === 'room') {
             const w = worldPos.x - dragStart.x;
             const h = worldPos.y - dragStart.y;
-            floorPlan.addRoom({ x: dragStart.x, y: dragStart.y, w, h }, 'wall'); // outer walls
+            floorPlan.addRoom({ x: dragStart.x, y: dragStart.y, w, h }, 'wall');
         }
         else if (['wall', 'door', 'window'].includes(currentTool)) {
-            floorPlan.addWall(dragStart, worldPos, currentTool);
+            let type = currentTool;
+            if (type === 'wall') {
+                type = document.getElementById('wallThickness').value;
+            }
+            floorPlan.addWall(dragStart, worldPos, type);
         }
 
         renderAll();
@@ -271,6 +288,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // Init
     setTimeout(handleResize, 100);
 
+    // --- Keyboard Shortcuts ---
+    document.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+
+        // Undo: Ctrl+Z
+        if (e.ctrlKey && key === 'z') {
+            e.preventDefault();
+            if (floorPlan.undo()) { renderAll(); requestVisUpdate(); log('Undo'); }
+        }
+        // Redo: Ctrl+Y or Ctrl+Shift+Z
+        if ((e.ctrlKey && key === 'y') || (e.ctrlKey && e.shiftKey && key === 'z')) {
+            e.preventDefault();
+            if (floorPlan.redo()) { renderAll(); requestVisUpdate(); log('Redo'); }
+        }
+
+        // Delete Mode? Maybe just Esc to reset tool
+        if (e.key === 'Escape') {
+            // currentTool = 'select'; // logic to reset tool?
+        }
+        // Delete/Backspace
+        if (key === 'delete' || key === 'backspace') {
+            log(`Use the Eraser tool (E) to remove items.`);
+        }
+    });
+
     // --- Toolbar Actions ---
     document.getElementById('btnUndo').addEventListener('click', () => {
         if (floorPlan.undo()) { renderAll(); requestVisUpdate(); log('Undo'); }
@@ -279,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (floorPlan.redo()) { renderAll(); requestVisUpdate(); log('Redo'); }
     });
     document.getElementById('btnClear').addEventListener('click', () => {
-        if (confirm('Delete Everything?')) { floorPlan.clearWalls(); renderAll(); requestVisUpdate(); log('Cleared All'); }
+        if (confirm('Delete Everything?')) { floorPlan.clearAll(); renderAll(); requestVisUpdate(); log('Cleared All'); }
     });
 
     // --- Config Actions ---
@@ -314,12 +356,18 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.innerHTML = '<i class="bi bi-magic me-2"></i> Auto-Optimize Placement';
     });
 
-    // --- View Options ---
     document.getElementById('toggleGrid').addEventListener('click', (e) => {
         e.preventDefault();
-        // Toggle logic if needed, currently transparent grid
+        renderer.toggleGrid();
+        renderAll();
     });
 
-    log('Welcome to Wi-Fi Architect Pro.');
-    log('Press "R" to draw rooms, Right-Click to move router.');
+    document.getElementById('toggleHeatmap').addEventListener('click', (e) => {
+        e.preventDefault();
+        renderer.toggleHeatmap();
+        if (renderer.showHeatmap) requestVisUpdate();
+    });
+
+    log('Welcome to Net Plan.');
+    log('Select "Router" tool to place access point.');
 });

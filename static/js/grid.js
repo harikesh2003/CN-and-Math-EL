@@ -4,6 +4,7 @@ class FloorPlan {
         this.height = height;
         this.walls = []; // Array of {start: {x,y}, end: {x,y}, type: string}
         this.router = null; // {x, y}
+        this.boosters = []; // Array of {x, y}
 
         // History for Undo/Redo
         this.history = [];
@@ -23,7 +24,8 @@ class FloorPlan {
         // Deep copy
         const state = {
             walls: JSON.parse(JSON.stringify(this.walls)),
-            router: this.router ? { ...this.router } : null
+            router: this.router ? { ...this.router } : null,
+            boosters: JSON.parse(JSON.stringify(this.boosters))
         };
 
         this.history.push(state);
@@ -51,17 +53,17 @@ class FloorPlan {
     restoreState(state) {
         this.walls = JSON.parse(JSON.stringify(state.walls));
         this.router = state.router ? { ...state.router } : null;
+        this.boosters = state.boosters ? JSON.parse(JSON.stringify(state.boosters)) : [];
     }
 
     // --- Actions ---
 
     addWall(start, end, type) {
-        this.saveState();
         this.walls.push({ start, end, type });
+        this.saveState(); // Save AFTER change
     }
 
     addRoom(rect, type) {
-        this.saveState();
         const { x, y, w, h } = rect;
         // Top
         this.walls.push({ start: { x, y }, end: { x: x + w, y }, type });
@@ -71,29 +73,47 @@ class FloorPlan {
         this.walls.push({ start: { x: x + w, y: y + h }, end: { x, y: y + h }, type });
         // Left
         this.walls.push({ start: { x, y: y + h }, end: { x, y }, type });
+        this.saveState(); // Save AFTER change
     }
 
     removeWall(wallObj) {
-        this.saveState();
         this.walls = this.walls.filter(w => w !== wallObj);
+        this.saveState(); // Save AFTER change
     }
 
     setRouter(x, y) {
         // Only save state if it's a distinct action, usually called by UI mouseup
         // For drag, we might not want to save every frame.
         // We will assume the UI calls this once on drop.
-        this.saveState();
         this.router = { x, y };
+        this.saveState(); // Save AFTER change
+    }
+
+    addBooster(x, y) {
+        this.boosters.push({ x, y });
+        this.saveState(); // Save AFTER change
+    }
+
+    removeBooster(boosterObj) {
+        this.boosters = this.boosters.filter(b => b !== boosterObj);
+        this.saveState(); // Save AFTER change
     }
 
     clearRouter() {
-        this.saveState();
         this.router = null;
+        this.saveState(); // Save AFTER change
     }
 
     clearWalls() {
-        this.saveState();
         this.walls = [];
+        this.saveState(); // Save AFTER change
+    }
+
+    clearAll() {
+        this.walls = [];
+        this.router = null;
+        this.boosters = [];
+        this.saveState(); // Save AFTER change
     }
 
     // --- Utils ---

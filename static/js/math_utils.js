@@ -9,12 +9,13 @@ const MathUtils = {
         '2.4': 28, // Constant for 2.4GHz
         '5.0': 34  // Higher loss for 5GHz
     },
-    
+
     // Attenuation values (dB)
     WALL_LOSS: {
-        'wall': 12,    // Concrete/Brick
-        'window': 3,   // Glass
-        'door': 6      // Wood
+        'wall': 12,      // Standard Brick/Drywall
+        'wall_thick': 25, // Concrete/Load Bearing
+        'window': 3,     // Glass
+        'door': 6        // Wood
     },
 
     /**
@@ -66,9 +67,9 @@ const MathUtils = {
         // PL = 20log10(d) + 20log10(f) - 27.55 (Free Space) -> This is often too optimistic for indoors
         // One-Slope Model: PL = L0 + 10n log10(d)
         // L0 approx 40dB for 2.4GHz at 1m. n approx 2.5 to 3.5 for indoors.
-        
+
         let pathLossExp = 2.0; // Free space mostly, walls handle the rest
-        let L0 = (frequency === 2.4) ? 40 : 47; 
+        let L0 = (frequency === 2.4) ? 40 : 47;
 
         // Basic Path Loss
         let pl = L0 + 10 * pathLossExp * Math.log10(d_m);
@@ -82,7 +83,7 @@ const MathUtils = {
         }
 
         let rssi = txPower - pl - wallLoss;
-        
+
         // Clamp reasonable values
         return Math.max(-100, Math.min(rssi, txPower));
     }
