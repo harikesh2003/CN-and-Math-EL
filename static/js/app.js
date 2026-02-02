@@ -1,25 +1,26 @@
-// App Controller - V3 Modern Dashboard Logic
+// App Controller - V3 Modern Dashboard Logic (3D Enhanced)
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- Configuration ---
     const CONFIG = {
         gridSize: 2000,
         txStart: 20,
-        freqStart: 2.4
+        freqStart: 2.4,
+        snap: 20 // 1 Meter approx
     };
 
     // --- State ---
     const floorPlan = new FloorPlan(CONFIG.gridSize, CONFIG.gridSize);
-    const renderer = new Renderer('floorPlan', 'heatmap', 'uiLayer', floorPlan);
+    // Use ThreeRenderer instead of Canvas Renderer
+    const renderer = new ThreeRenderer('canvasContainer', floorPlan);
     const engine = new SignalEngine(floorPlan);
 
     let currentTool = 'select'; // select (pan), room, wall, door, window, erase
     let isDragging = false;
     let dragStart = { x: 0, y: 0 }; // World Coords
-    let panStart = { x: 0, y: 0 };  // Screen Coords
 
     // --- DOM Elements ---
-    const canvasViewport = document.getElementById('canvasContainer'); // The Wrapper
+    const canvasContainer = document.getElementById('canvasContainer');
     const uiRefs = {
         txPower: document.getElementById('txPower'),
         txPowerVal: document.getElementById('txPowerVal'),
@@ -40,8 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Core Logic ---
     function updateSimulation(full = false) {
         if (!floorPlan.router) {
-            renderer.clear(renderer.hmCtx);
-            // Draw ghost router if needed or just nothing
+            renderer.heatmapGroup.clear();
             renderer.drawRouterOnUI();
             return;
         }
@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const renderAll = () => {
         renderer.drawWalls();
-        renderer.drawRouterOnUI(); // Router is mostly static unless dragging
+        renderer.drawRouterOnUI();
     };
 
     // debouncer
@@ -87,183 +87,209 @@ document.addEventListener('DOMContentLoaded', () => {
             log(`Tool selected: ${currentTool}`);
 
             // Cursor update
-            if (currentTool === 'select') canvasViewport.style.cursor = 'grab';
-            else canvasViewport.style.cursor = 'crosshair';
+            if (currentTool === 'select') {
+                canvasContainer.style.cursor = 'default';
+                renderer.controls.enabled = true; // Enable Orbit
+            } else {
+                canvasContainer.style.cursor = 'crosshair';
+                renderer.controls.enabled = false; // Disable Orbit while drawing
+            }
         });
     });
 
-    // --- Zoom Controls ---
-    const zoomIn = () => {
-        renderer.scale = Math.min(renderer.scale + 0.2, 5.0);
-        renderAll();
-    };
-    const zoomOut = () => {
-        renderer.scale = Math.max(renderer.scale - 0.2, 0.2);
-        renderAll();
-    };
-    const zoomReset = () => {
-        renderer.scale = 1.0;
-        renderer.offset = { x: 0, y: 0 };
-        renderAll();
-    };
+    // --- Zoom Controls (Handled by OrbitControls now) ---
+    document.getElementById('btnZoomIn').addEventListener('click', () => {
+        renderer.camera.position.y -= 100;
+        renderer.controls.update();
+    });
+    document.getElementById('btnZoomOut').addEventListener('click', () => {
+        renderer.camera.position.y += 100;
+        renderer.controls.update();
+    });
+    document.getElementById('btnResetZoom').addEventListener('click', () => {
+        renderer.camera.position.set(0, 800, 800);
+        renderer.controls.target.set(0, 0, 0);
+        renderer.controls.update();
+    });
 
-    document.getElementById('btnZoomIn').addEventListener('click', zoomIn);
-    document.getElementById('btnZoomOut').addEventListener('click', zoomOut);
-    document.getElementById('btnResetZoom').addEventListener('click', zoomReset);
+    // --- Mouse Interactions ---
 
-    // --- Mouse Interactions (Attached to VIEWPORT) ---
-    // Using viewport ensures we catch events even if canvases have pointer-events:none
-
-    const getEvtPos = (e) => {
-        const rect = canvasViewport.getBoundingClientRect();
-        return {
-            mx: e.clientX - rect.left,
-            my: e.clientY - rect.top
-        };
+    // Helper: Get World Position via Raycast
+    const get3DPos = (e) => {
+        const rect = renderer.renderer.domElement.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        return { x, y }; // Return NDC
     };
 
-    canvasViewport.addEventListener('mousedown', (e) => {
-        const { mx, my } = getEvtPos(e);
-        const worldPos = renderer.screenToWorld(mx, my);
+    let routerDrag = false;
+    let hoveredWall = null;
 
-        // Right Click: Place Router
+    canvasContainer.addEventListener('mousedown', (e) => {
+        const ndc = get3DPos(e);
+        const pt = renderer.getRayIntersection(ndc);
+
+        // 1. Check Router Drag (Left Click)
+        if (e.button === 0 && currentTool === 'select') {
+            // Raycast against router group
+            const routerHit = renderer.getIntersectedObject(ndc, renderer.routerGroup.children);
+            if (routerHit) {
+                routerDrag = true;
+                renderer.controls.enabled = false;
+                canvasContainer.style.cursor = 'grabbing';
+                return;
+            }
+        }
+
+        // 2. Right Click (Place Router)
         if (e.button === 2) {
-            log(`Router placed at ${Math.round(worldPos.x)}, ${Math.round(worldPos.y)}`);
-            floorPlan.setRouter(worldPos.x, worldPos.y);
-            renderAll();
-            requestVisUpdate();
+            if (pt) {
+                const snapP = {
+                    x: Math.round(pt.x / CONFIG.snap) * CONFIG.snap,
+                    y: Math.round(pt.z / CONFIG.snap) * CONFIG.snap
+                };
+                log(`Router placed at ${snapP.x}, ${snapP.y}`);
+                floorPlan.setRouter(snapP.x, snapP.y);
+                renderAll();
+                requestVisUpdate();
+            }
             return;
         }
 
-        // Left Click
-        if (e.button === 0) {
-            // Pan
-            if (currentTool === 'select') {
-                isDragging = true;
-                panStart = { x: mx, y: my };
-                canvasViewport.style.cursor = 'grabbing';
-                return;
-            }
+        // 3. Drawing Start
+        if (e.button === 0 && currentTool !== 'select' && pt) {
+            const snapP = {
+                x: Math.round(pt.x / CONFIG.snap) * CONFIG.snap,
+                y: Math.round(pt.z / CONFIG.snap) * CONFIG.snap
+            };
 
-            // Eraser
+            isDragging = true;
+            dragStart = snapP;
+
             if (currentTool === 'erase') {
-                const hit = floorPlan.getWallAt(worldPos);
+                const hit = floorPlan.getWallAt(snapP, 30);
                 if (hit) {
                     floorPlan.removeWall(hit);
                     renderAll();
                     requestVisUpdate();
                 }
-                isDragging = true; // allow drag erase
-                return;
             }
-
-            // Drawing Tools
-            isDragging = true;
-            dragStart = worldPos;
-            panStart = { x: mx, y: my }; // used for screen-space preview
         }
     });
 
-    canvasViewport.addEventListener('mousemove', (e) => {
-        const { mx, my } = getEvtPos(e);
-        const worldPos = renderer.screenToWorld(mx, my);
+    canvasContainer.addEventListener('mousemove', (e) => {
+        const ndc = get3DPos(e);
+        const pt = renderer.getRayIntersection(ndc); // Ground intersection
+        if (!pt) return;
 
-        if (!isDragging) {
-            // Hover effects (optional)
+        // Dynamic Router Drag
+        if (routerDrag) {
+            renderer.updateRouterPos(pt.x, pt.z);
+            floorPlan.router.x = pt.x;
+            floorPlan.router.y = pt.z;
+
+            // Fast Heatmap Update (Low Res)
+            // Throttle this in real app, but let's try direct
+            // To avoid lag, maybe just clear effects or show simple radius?
+            // requestVisUpdate() is debounced 150ms.
+            requestVisUpdate();
             return;
         }
 
-        // Panning
-        if (currentTool === 'select') {
-            const dx = mx - panStart.x;
-            const dy = my - panStart.y;
-            renderer.offset.x += dx;
-            renderer.offset.y += dy;
-            panStart = { x: mx, y: my };
-            renderAll();
-            return;
-        }
+        // Hover Effects (Select Mode)
+        if (currentTool === 'select' && !isDragging) {
+            const wallHit = renderer.getIntersectedObject(ndc, renderer.wallGroup.children);
 
-        // Drag Eraser
-        if (currentTool === 'erase') {
-            const hit = floorPlan.getWallAt(worldPos);
-            if (hit) {
-                floorPlan.removeWall(hit);
-                renderAll();
-                requestVisUpdate(); // maybe too heavy? debounce
+            if (hoveredWall && hoveredWall !== wallHit) {
+                renderer.highlightWall(hoveredWall, false);
+                hoveredWall = null;
+                canvasContainer.style.cursor = 'default';
             }
+
+            if (wallHit) {
+                renderer.highlightWall(wallHit, true);
+                hoveredWall = wallHit;
+                canvasContainer.style.cursor = 'pointer';
+            }
+
+            // Check Router Hover
+            const routerHit = renderer.getIntersectedObject(ndc, renderer.routerGroup.children);
+            if (routerHit) canvasContainer.style.cursor = 'grab';
             return;
         }
 
-        // Drawing Previews
-        // Clear UI layer first
-        renderer.clear(renderer.uiCtx);
-        renderer.drawRouterOnUI(); // Keep router visible
+        if (!isDragging) return;
 
-        if (currentTool === 'room') {
-            // Draw Box Preview
-            const w = worldPos.x - dragStart.x;
-            const h = worldPos.y - dragStart.y;
-
-            renderer.resetTransform(renderer.uiCtx);
-            renderer.uiCtx.fillStyle = 'rgba(79, 70, 229, 0.1)'; // Indigo tint
-            renderer.uiCtx.strokeStyle = '#4f46e5';
-            renderer.uiCtx.lineWidth = 2 / renderer.scale;
-            renderer.uiCtx.setLineDash([5, 5]);
-
-            renderer.uiCtx.fillRect(dragStart.x, dragStart.y, w, h);
-            renderer.uiCtx.strokeRect(dragStart.x, dragStart.y, w, h);
-            renderer.uiCtx.setLineDash([]);
+        // Drawing Logic
+        if (currentTool === 'erase') {
+            const hit = floorPlan.getWallAt({ x: pt.x, y: pt.z }, 30);
+            if (hit) { floorPlan.removeWall(hit); renderAll(); requestVisUpdate(); }
+            return;
         }
-        else if (['wall', 'door', 'window'].includes(currentTool)) {
-            // Line Preview
-            renderer.drawPreviewLine(dragStart, worldPos);
+
+        const snapP = {
+            x: Math.round(pt.x / CONFIG.snap) * CONFIG.snap,
+            y: Math.round(pt.z / CONFIG.snap) * CONFIG.snap
+        };
+
+        // Preview
+        renderer.previewGroup.clear();
+        if (currentTool === 'room') {
+            const w = snapP.x - dragStart.x;
+            const h = snapP.y - dragStart.y;
+            renderer.drawPreviewRect(dragStart, w, h);
+        } else if (['wall', 'door', 'window'].includes(currentTool)) {
+            renderer.drawPreviewLine(dragStart, snapP);
         }
     });
 
     window.addEventListener('mouseup', (e) => {
+        if (routerDrag) {
+            routerDrag = false;
+            renderer.controls.enabled = true;
+            canvasContainer.style.cursor = 'grab';
+            renderAll(); // Final snap/render
+            requestVisUpdate(); // Final high-res calc
+            log('Router moved.');
+            return;
+        }
+
         if (!isDragging) return;
         isDragging = false;
 
-        // Restore cursor
-        if (currentTool === 'select') canvasViewport.style.cursor = 'grab';
-        else canvasViewport.style.cursor = 'crosshair';
-
-        // Check if it was a valid drag (screen coords)
-        const { mx, my } = getEvtPos(e);
-        // If panning, we are done
         if (currentTool === 'select') return;
 
-        // If drawing
-        const worldPos = renderer.screenToWorld(mx, my);
-        const dist = Math.sqrt(Math.pow(worldPos.x - dragStart.x, 2) + Math.pow(worldPos.y - dragStart.y, 2));
+        const ndc = get3DPos(e);
+        const pt = renderer.getRayIntersection(ndc);
+        if (!pt) return;
 
-        // cleanup UI layer
-        renderer.clear(renderer.uiCtx);
-        renderer.drawRouterOnUI();
+        const snapP = {
+            x: Math.round(pt.x / CONFIG.snap) * CONFIG.snap,
+            y: Math.round(pt.z / CONFIG.snap) * CONFIG.snap
+        };
 
-        if (dist < 5 && currentTool !== 'erase') return; // too small
+        if (currentTool === 'erase') return;
 
-        // Commit Action
+        // Commit target
         if (currentTool === 'room') {
-            const w = worldPos.x - dragStart.x;
-            const h = worldPos.y - dragStart.y;
-            floorPlan.addRoom({ x: dragStart.x, y: dragStart.y, w, h }, 'wall'); // outer walls
-        }
-        else if (['wall', 'door', 'window'].includes(currentTool)) {
-            floorPlan.addWall(dragStart, worldPos, currentTool);
+            const w = snapP.x - dragStart.x;
+            const h = snapP.y - dragStart.y;
+            if (Math.abs(w) > 5 && Math.abs(h) > 5)
+                floorPlan.addRoom({ x: dragStart.x, y: dragStart.y, w, h }, 'wall');
+        } else if (['wall', 'door', 'window'].includes(currentTool)) {
+            const d = Math.sqrt(Math.pow(snapP.x - dragStart.x, 2) + Math.pow(snapP.y - dragStart.y, 2));
+            if (d > 5)
+                floorPlan.addWall(dragStart, snapP, currentTool);
         }
 
+        renderer.previewGroup.clear();
         renderAll();
         requestVisUpdate();
     });
 
-    // Prevent context menu
-    canvasViewport.addEventListener('contextmenu', e => e.preventDefault());
-
     // Resize Handle
     const handleResize = () => {
-        const rect = canvasViewport.getBoundingClientRect();
+        const rect = canvasContainer.getBoundingClientRect();
         renderer.resize(rect.width, rect.height);
         renderAll();
     };
@@ -314,12 +340,10 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.innerHTML = '<i class="bi bi-magic me-2"></i> Auto-Optimize Placement';
     });
 
-    // --- View Options ---
-    document.getElementById('toggleGrid').addEventListener('click', (e) => {
-        e.preventDefault();
-        // Toggle logic if needed, currently transparent grid
-    });
+    // Disable context menu
+    canvasContainer.addEventListener('contextmenu', e => e.preventDefault());
 
-    log('Welcome to Wi-Fi Architect Pro.');
-    log('Press "R" to draw rooms, Right-Click to move router.');
+    log('Welcome to Wi-Fi Architect 3D.');
+    log('Hold LEFT Click to Draw. Right Click to place Router.');
+    log('Left Click + Drag to Rotate (Select Mode).');
 });
